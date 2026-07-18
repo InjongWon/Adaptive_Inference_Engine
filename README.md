@@ -127,12 +127,6 @@ curl http://localhost:8000/v1/completions \
 - Add a reproducibility command for every headline result.
 - Use only measured numbers in resume bullets.
 
-## Learning TODO map
-
-Search for `TODO` and `LEARNING TODO`:
-
-```bash
-rg "TODO|LEARNING TODO"
 ```
 
 High-value tasks:
