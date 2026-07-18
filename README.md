@@ -76,64 +76,54 @@ curl http://localhost:8000/v1/completions \
   -d '{"model":"Qwen/Qwen3-1.7B","prompt":"Explain KV cache.","max_tokens":64}'
 ```
 
-## Seven-day project plan
-
-### Day 1: serving fundamentals
+## High Level Design 
 
 - Run the baseline vLLM server.
 - Trace one request through tokenizer, prefill, decode, and streaming.
 - Complete gateway integration tests.
 - Record model, GPU, driver, CUDA, PyTorch, and vLLM versions.
 
-### Day 2: sampling and streaming
+### sampling and streaming
 
 - Implement accurate token counting.
 - Implement streaming TTFT and TPOT measurement.
 - Compare greedy, low-temperature, and high-temperature generation.
 - Explain why sampling changes quality but not the model logits themselves.
 
-### Day 3: scheduler and continuous batching
+### Scheduler and continuous batching
 
 - Implement mixed-length workloads.
 - Sweep `max-num-seqs` and `max-num-batched-tokens`.
 - Measure throughput, queue depth, P95/P99 latency, and fairness.
 - Add one admission-control strategy to the gateway.
 
-### Day 4: KV cache and PagedAttention
+### KV cache and PagedAttention
 
 - Sweep prompt length, output length, concurrency, and maximum model length.
 - Capture vLLM cache metrics before/during/after each experiment.
 - Estimate KV-cache bytes analytically and compare with observed capacity.
 - Trigger and explain preemption or OOM safely.
 
-### Day 5: quantization and speculative decoding
+### quantization and speculative decoding
 
 - Select a compatible pre-quantized model.
 - Compare BF16/FP16 against AWQ or GPTQ.
 - Compare normal decoding against a draft-model configuration.
 - Report the operating region where speculation helps and where overhead wins.
 
-### Day 6: tensor parallelism and profiling
+### tensor parallelism and profiling
 
 - Compare TP=1 and TP=2 using identical workloads.
 - Measure per-GPU memory, throughput, latency, and communication overhead.
 - Capture one Nsight Systems trace.
 - Determine whether the workload is compute-, bandwidth-, capacity-, or scheduler-bound.
 
-### Day 7: report and resume evidence
+### Some report
 
 - Add plots and a Grafana dashboard.
 - Finish `BENCHMARKS.md` and `docs/INTERVIEW_NOTES.md`.
 - Add a reproducibility command for every headline result.
 - Use only measured numbers in resume bullets.
-
-## Learning TODO map
-
-Search for `TODO` and `LEARNING TODO`:
-
-```bash
-rg "TODO|LEARNING TODO"
-```
 
 High-value tasks:
 
