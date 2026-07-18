@@ -1,0 +1,8 @@
+{
+  "title": "Adaptive LLM Serving - Starter",
+  "schemaVersion": 39,
+  "panels": [],
+  "annotations": {"list": []},
+  "time": {"from": "now-15m", "to": "now"},
+  "refresh": "5s"
+}
