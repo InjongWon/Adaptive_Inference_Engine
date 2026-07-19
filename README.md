@@ -9,8 +9,6 @@ The repository intentionally separates:
 3. **Benchmark harness** — reproducible workloads for TTFT, TPOT/ITL, throughput, tail latency, memory pressure, and scheduler experiments.
 4. **Observability** — Prometheus/Grafana scaffolding and raw metric snapshots.
 
-> Do not claim that you implemented PagedAttention or vLLM's scheduler from scratch. Your contribution is the serving architecture, experiment design, workload generation, observability, profiling, analysis, and any source-level extensions you later add.
-
 ## Architecture
 
 ```text
