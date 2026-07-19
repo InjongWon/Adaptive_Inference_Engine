@@ -173,7 +173,7 @@ Example only after measurement:
 Benchmarked continuous batching on Qwen3-1.7B/A10G across 32 concurrent mixed-length requests, sustaining X output tokens/s while holding P95 TTFT below Y ms.
 ```
 
-## Useful commands
+## Run commands
 
 ```bash
 make test
