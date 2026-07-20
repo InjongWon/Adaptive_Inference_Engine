@@ -118,10 +118,7 @@ curl http://localhost:8000/v1/completions \
 
 ### Some report
 
-- Add plots and a Grafana dashboard.
-- Finish `BENCHMARKS.md` and `docs/INTERVIEW_NOTES.md`.
-- Add a reproducibility command for every headline result.
-- Use only measured numbers in resume bullets.
+- `BENCHMARKS.md`
 
 ```
 
