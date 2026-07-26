@@ -37,7 +37,7 @@ vLLM OpenAI-compatible server :8000 ----> vLLM /metrics
 ## Setup
 
 ```bash
-python3.11 -m venv .venv
+python3.14 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env
