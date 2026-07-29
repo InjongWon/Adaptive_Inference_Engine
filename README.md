@@ -1,6 +1,6 @@
 # Adaptive LLM Serving
 
-A learning-first, production-style project for understanding and benchmarking modern LLM inference with **vLLM**.
+A learning-first, production benchmark for modern LLM inference with **vLLM**.
 
 The repository intentionally separates:
 
