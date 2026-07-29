@@ -9,8 +9,6 @@ The repository intentionally separates:
 3. **Benchmark harness** — reproducible workloads for TTFT, TPOT/ITL, throughput, tail latency, memory pressure, and scheduler experiments.
 4. **Observability** — Prometheus/Grafana scaffolding and raw metric snapshots.
 
-> Do not claim that you implemented PagedAttention or vLLM's scheduler from scratch. Your contribution is the serving architecture, experiment design, workload generation, observability, profiling, analysis, and any source-level extensions you later add.
-
 ## Architecture
 
 ```text
@@ -39,7 +37,7 @@ vLLM OpenAI-compatible server :8000 ----> vLLM /metrics
 ## Setup
 
 ```bash
-python3.11 -m venv .venv
+python3.14 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env
@@ -120,10 +118,7 @@ curl http://localhost:8000/v1/completions \
 
 ### Some report
 
-- Add plots and a Grafana dashboard.
-- Finish `BENCHMARKS.md` and `docs/INTERVIEW_NOTES.md`.
-- Add a reproducibility command for every headline result.
-- Use only measured numbers in resume bullets.
+- `BENCHMARKS.md`
 
 ```
 
@@ -175,7 +170,7 @@ Example only after measurement:
 Benchmarked continuous batching on Qwen3-1.7B/A10G across 32 concurrent mixed-length requests, sustaining X output tokens/s while holding P95 TTFT below Y ms.
 ```
 
-## Useful commands
+## Run commands
 
 ```bash
 make test
