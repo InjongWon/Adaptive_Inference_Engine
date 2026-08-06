@@ -81,29 +81,76 @@ The objective of this project is to build a lightweight inference gateway that s
 
 ```text
 adaptive-llm-serving/
-
-app/
-    api.py
-    config.py
-    metrics.py
-    schemas.py
-    vllm_client.py
-
-benchmark/
-    load_generator.py
-    metrics.py
-    plot_results.py
-    prometheus_snapshot.py
-    streaming_benchmark.py
-    workloads.py
-
-tests/
-
-Dockerfile
-docker-compose.yml
-README.md
+├── app/
+│   ├── __init__.py
+│   ├── api.py
+│   ├── config.py
+│   ├── metrics.py
+│   ├── schemas.py
+│   └── vllm_client.py
+│
+├── benchmark/
+│   ├── __init__.py
+│   ├── load_generator.py
+│   ├── metrics.py
+│   ├── plot_results.py
+│   ├── prometheus_snapshot.py
+│   ├── streaming_benchmark.py
+│   └── workloads.py
+│
+├── configs/
+│   ├── baseline.yaml
+│   ├── quantization.yaml
+│   ├── speculative_decoding.yaml
+│   └── tensor_parallel.yaml
+│
+├── docs/
+│   ├── architecture.md
+│   ├── benchmark_methodology.md
+│   └── results.md
+│
+├── monitoring/
+│   ├── prometheus.yml
+│   └── grafana/
+│       ├── dashboard-starter.json
+│       └── provisioning/
+│           ├── dashboards/
+│           │   └── dashboards.yml
+│           └── datasources/
+│               └── prometheus.yml
+│
+├── results/
+│   ├── raw/
+│   │   └── .gitkeep
+│   ├── summaries/
+│   │   └── .gitkeep
+│   └── figures/
+│       └── .gitkeep
+│
+├── scripts/
+│   ├── run_baseline.sh
+│   ├── run_benchmarks.sh
+│   ├── run_quantization.sh
+│   ├── run_speculative_decoding.sh
+│   └── run_tensor_parallel.sh
+│
+├── tests/
+│   ├── test_api.py
+│   ├── test_metrics.py
+│   ├── test_schemas.py
+│   └── test_vllm_client.py
+│
+├── .env
+├── .env.example
+├── .gitignore
+├── CONTRIBUTING.md
+├── Dockerfile
+├── LICENSE
+├── Makefile
+├── README.md
+├── docker-compose.yml
+└── pyproject.toml
 ```
-
 ---
 
 # Gateway Architecture
