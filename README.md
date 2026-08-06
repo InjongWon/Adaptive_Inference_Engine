@@ -1,185 +1,479 @@
-# Adaptive LLM Serving
+# Adaptive LLM Serving Gateway
 
-A learning-first, production benchmark for modern LLM inference with **vLLM**.
+A production-style inference gateway built on top of **vLLM** that provides a unified HTTP API for text generation, supports both streaming and non-streaming inference, exposes Prometheus metrics for observability, and includes a benchmarking framework for evaluating latency, throughput, and scaling behavior under concurrent workloads.
 
-The repository intentionally separates:
+---
 
-1. **vLLM engine** — model execution, scheduling, continuous batching, PagedAttention/KV-cache management, quantization, speculative decoding, tensor parallelism.
-2. **Learning gateway** — a small FastAPI layer where you implement timeouts, cancellation, admission control, metrics, and error handling.
-3. **Benchmark harness** — reproducible workloads for TTFT, TPOT/ITL, throughput, tail latency, memory pressure, and scheduler experiments.
-4. **Observability** — Prometheus/Grafana scaffolding and raw metric snapshots.
+## Overview
 
-## Architecture
+Modern LLM inference servers such as vLLM provide extremely high throughput, but production deployments typically require additional infrastructure:
+
+- Request validation
+- Public API gateway
+- Streaming support
+- Error handling
+- Metrics and monitoring
+- Benchmarking
+- Load testing
+
+This project implements those production components while keeping the inference engine delegated to vLLM.
+
+---
+
+# Problem
+
+Large Language Models require significantly more infrastructure than simply exposing an inference endpoint.
+
+Production deployments must handle:
+
+- HTTP request validation
+- Streaming token delivery
+- Error handling and retries
+- Latency measurement
+- Request accounting
+- Concurrent workloads
+- Benchmarking
+- Production monitoring
+
+The objective of this project is to build a lightweight inference gateway that sits in front of vLLM while exposing production-grade observability and benchmarking capabilities.
+
+---
+
+# System Architecture
 
 ```text
-Async clients / load generator
-             |
-             v
-FastAPI learning gateway :8080 ----> gateway /metrics
-             |
-             v
-vLLM OpenAI-compatible server :8000 ----> vLLM /metrics
-             |
-     scheduler + continuous batching
-             |
-       paged KV-cache blocks
-             |
- GPU worker(s): BF16 / INT4 / speculative / TP
+                Client
+
+                   │
+                   ▼
+
+        FastAPI Gateway
+        ──────────────────
+        Request Validation
+        Error Handling
+        Streaming
+        Metrics
+        Benchmark API
+
+                   │
+
+          HTTP (OpenAI API)
+
+                   │
+                   ▼
+
+              vLLM Server
+
+                   │
+                   ▼
+
+         Transformer Model
+
+                   │
+                   ▼
+
+            Generated Tokens
 ```
+
+---
+
+# Repository Structure
+
+```text
+adaptive-llm-serving/
+
+app/
+    api.py
+    config.py
+    metrics.py
+    schemas.py
+    vllm_client.py
+
+benchmark/
+    load_generator.py
+    metrics.py
+    plot_results.py
+    prometheus_snapshot.py
+    streaming_benchmark.py
+    workloads.py
+
+tests/
+
+Dockerfile
+docker-compose.yml
+README.md
+```
+
+---
+
+# Gateway Architecture
+
+```text
+Incoming HTTP Request
+
+        │
+
+        ▼
+
+GenerateRequest
+(Pydantic Validation)
+
+        │
+
+        ▼
+
+Generate Endpoint
+
+        │
+
+ ┌───────────────┐
+ │ stream=False  │──────────────┐
+ └───────────────┘              │
+                                │
+                                ▼
+
+                         client.complete()
+
+                                │
+
+                                ▼
+
+                      JSON Response Returned
+
+
+ ┌───────────────┐
+ │ stream=True   │──────────────┐
+ └───────────────┘              │
+                                ▼
+
+                         client.stream()
+
+                                │
+
+                        Async Generator
+
+                                │
+
+                       StreamingResponse
+
+                                │
+
+                          Token Chunks
+```
+
+---
+
+# How the Gateway Works
+
+The gateway provides a clean interface in front of the vLLM server.
+
+Responsibilities include:
+
+- Validating incoming requests
+- Constructing OpenAI-compatible payloads
+- Forwarding inference requests to vLLM
+- Supporting both synchronous and streaming generation
+- Translating upstream failures into HTTP errors
+- Recording Prometheus metrics
+- Returning standardized API responses
+
+---
+
+# Streaming Inference
+
+Streaming uses Server-Sent Events (SSE).
+
+Workflow:
+
+```
+Client
+
+    │
+
+POST /generate
+
+    │
+
+stream=true
+
+    ▼
+
+Gateway
+
+    │
+
+client.stream()
+
+    │
+
+Receive SSE chunks
+
+    │
+
+yield text
+
+    │
+
+StreamingResponse
+
+    ▼
+
+Client receives incremental tokens
+```
+
+Unlike the non-streaming endpoint, the gateway forwards generated text immediately as it arrives from vLLM without waiting for completion.
+
+---
+
+# Observability
+
+The gateway exports Prometheus metrics.
+
+Metrics include:
+
+| Metric | Description |
+|---------|-------------|
+| gateway_requests_total | Total requests |
+| gateway_inflight_requests | Active requests |
+| gateway_request_latency_seconds | Request latency histogram |
+
+Prometheus scrapes the `/metrics` endpoint while Grafana visualizes request rate, latency, and system health.
+
+---
+
+# Benchmark Framework
+
+The benchmark suite evaluates inference performance under configurable workloads.
+
+Measurements include:
+
+- Request latency
+- Throughput
+- Success rate
+- Time-to-first-token (TTFT)
+- Streaming latency
+- Concurrent request scaling
+
+Benchmark modules:
+
+```
+benchmark/
+
+load_generator.py
+metrics.py
+streaming_benchmark.py
+workloads.py
+```
+
+---
+
+# Benchmark Methodology
+
+Experiments vary:
+
+- concurrency
+- prompt length
+- output length
+- streaming vs non-streaming
+- model
+- quantization
+- tensor parallelism
+
+Each benchmark records:
+
+- average latency
+- median latency
+- p95 latency
+- p99 latency
+- throughput
+- tokens/sec
+- TTFT
+
+---
+
+# Hardware & Software
 
 ## Hardware
 
-- Most development and unit tests run without a GPU.
-- Real inference benchmarks require a supported accelerator environment.
-- Tensor parallel experiments require at least two visible GPUs.
-- Start with a 0.6B–1.7B model if GPU memory is limited.
+| Component | Value |
+|-----------|-------|
+| GPU | *(To be filled after experiments)* |
+| CPU | *(To be filled)* |
+| Memory | *(To be filled)* |
 
-## Setup
+## Software
+
+| Component | Version |
+|-----------|---------|
+| Python | 3.11+ |
+| FastAPI | Latest |
+| httpx | Latest |
+| Prometheus | Latest |
+| Grafana | Latest |
+| vLLM | Latest |
+
+---
+
+# Experimental Results
+
+## Throughput
+
+| Concurrency | Requests/sec | Tokens/sec |
+|-------------|-------------:|-----------:|
+| 1 | TBD | TBD |
+| 4 | TBD | TBD |
+| 8 | TBD | TBD |
+| 16 | TBD | TBD |
+| 32 | TBD | TBD |
+
+---
+
+## Latency
+
+| Concurrency | Avg | p50 | p95 | p99 |
+|-------------|----:|----:|----:|----:|
+| 1 | TBD | TBD | TBD | TBD |
+| 4 | TBD | TBD | TBD | TBD |
+| 8 | TBD | TBD | TBD | TBD |
+| 16 | TBD | TBD | TBD | TBD |
+
+---
+
+# Charts
+
+Future benchmark results will include:
+
+- Throughput vs Concurrency
+- Latency vs Concurrency
+- TTFT vs Concurrency
+- GPU Utilization
+- GPU Memory Usage
+
+---
+
+# Quantization Findings
+
+*(To be completed after benchmarking.)*
+
+Planned comparison:
+
+- FP16/BF16
+- AWQ
+- GPTQ (if supported)
+
+Metrics:
+
+- throughput
+- latency
+- memory usage
+- output quality
+
+---
+
+# Tensor Parallel Findings
+
+*(To be completed after benchmarking.)*
+
+Planned comparison:
+
+- TP=1
+- TP=2
+- TP=4 (if hardware permits)
+
+Metrics:
+
+- throughput
+- latency
+- GPU utilization
+- memory distribution
+
+---
+
+# Limitations
+
+Current limitations include:
+
+- Single vLLM backend instance
+- No request batching inside the gateway
+- No authentication or rate limiting
+- No autoscaling
+- No distributed load balancing
+- Limited benchmark hardware until GPU experiments are completed
+
+---
+
+# Future Work
+
+Potential improvements:
+
+- Dynamic routing across multiple vLLM instances
+- Request batching
+- KV cache-aware scheduling
+- Kubernetes deployment
+- Distributed Prometheus/Grafana
+- Multi-model routing
+- Authentication
+- Rate limiting
+- Autoscaling
+
+---
+
+# Running the Project
 
 ```bash
-python3.14 -m venv .venv
+git clone <repo>
+
+cd adaptive-llm-serving
+
+python -m venv .venv
+
 source .venv/bin/activate
-pip install -e ".[dev]"
-cp .env.example .env
+
+pip install -r requirements.txt
 ```
 
-Install vLLM separately following the instructions for your CUDA and PyTorch environment. Pin the version you actually benchmark in `BENCHMARKS.md`.
-
-## First run
-
-Terminal 1:
+Start the gateway:
 
 ```bash
-./scripts/serve_baseline.sh
+uvicorn app.api:app --reload
 ```
 
-Terminal 2:
+View documentation:
+
+```
+http://localhost:8000/docs
+```
+
+View metrics:
+
+```
+http://localhost:8000/metrics
+```
+
+---
+
+# Running Benchmarks
 
 ```bash
-./scripts/run_gateway.sh
+python benchmark/load_generator.py
 ```
 
-Terminal 3:
+Streaming benchmark:
 
 ```bash
-python -m benchmark.load_generator --workload smoke
+python benchmark/streaming_benchmark.py
 ```
 
-Direct vLLM check:
+---
+
+# Running Tests
 
 ```bash
-curl http://localhost:8000/v1/completions \
-  -H 'Authorization: Bearer local-token' \
-  -H 'Content-Type: application/json' \
-  -d '{"model":"Qwen/Qwen3-1.7B","prompt":"Explain KV cache.","max_tokens":64}'
+pytest
 ```
 
-## High Level Design 
+---
 
-- Run the baseline vLLM server.
-- Trace one request through tokenizer, prefill, decode, and streaming.
-- Complete gateway integration tests.
-- Record model, GPU, driver, CUDA, PyTorch, and vLLM versions.
+# License
 
-### sampling and streaming
-
-- Implement accurate token counting.
-- Implement streaming TTFT and TPOT measurement.
-- Compare greedy, low-temperature, and high-temperature generation.
-- Explain why sampling changes quality but not the model logits themselves.
-
-### Scheduler and continuous batching
-
-- Implement mixed-length workloads.
-- Sweep `max-num-seqs` and `max-num-batched-tokens`.
-- Measure throughput, queue depth, P95/P99 latency, and fairness.
-- Add one admission-control strategy to the gateway.
-
-### KV cache and PagedAttention
-
-- Sweep prompt length, output length, concurrency, and maximum model length.
-- Capture vLLM cache metrics before/during/after each experiment.
-- Estimate KV-cache bytes analytically and compare with observed capacity.
-- Trigger and explain preemption or OOM safely.
-
-### quantization and speculative decoding
-
-- Select a compatible pre-quantized model.
-- Compare BF16/FP16 against AWQ or GPTQ.
-- Compare normal decoding against a draft-model configuration.
-- Report the operating region where speculation helps and where overhead wins.
-
-### tensor parallelism and profiling
-
-- Compare TP=1 and TP=2 using identical workloads.
-- Measure per-GPU memory, throughput, latency, and communication overhead.
-- Capture one Nsight Systems trace.
-- Determine whether the workload is compute-, bandwidth-, capacity-, or scheduler-bound.
-
-### Some report
-
-- `BENCHMARKS.md`
-
-```
-
-High-value tasks:
-
-- Accurate output-token accounting
-- TTFT and token-level TPOT
-- Mixed-length and bursty request generation
-- Queue-time correlation with vLLM metrics
-- Gateway cancellation and bounded admission control
-- Automated experiment matrix and environment capture
-- Quality comparison for quantized outputs
-- Speculative token acceptance-rate PromQL
-- TP scaling-efficiency calculation
-
-## Required experiment table
-
-For every run, record:
-
-| Field | Example |
-|---|---|
-| Engine version | vLLM x.y.z |
-| Model and revision | exact repository + commit |
-| GPU | A10G 24 GB |
-| Precision | BF16 / AWQ INT4 |
-| TP size | 1 / 2 |
-| Prompt distribution | 128–2048 tokens |
-| Output distribution | 32–256 tokens |
-| Concurrency | 1 / 8 / 16 / 32 |
-| Scheduler flags | max sequences, token budget |
-| TTFT | mean + P95 |
-| TPOT/ITL | mean + P95 |
-| Throughput | requests/s and output tokens/s |
-| Tail latency | P95/P99 |
-| GPU memory/utilization | peak and average |
-| KV-cache utilization | peak and preemption count |
-
-## Resume standard
-
-A strong claim has all four parts:
-
-```text
-optimization + workload + hardware + measured outcome
-```
-
-Example only after measurement:
-
-```text
-Benchmarked continuous batching on Qwen3-1.7B/A10G across 32 concurrent mixed-length requests, sustaining X output tokens/s while holding P95 TTFT below Y ms.
-```
-
-## Run commands
-
-```bash
-make test
-make lint
-make monitor
-make smoke
-make bench
-python -m benchmark.prometheus_snapshot --output results/before.prom
-```
-
-Grafana: `http://localhost:3000` (`admin` / `admin`)
-Prometheus: `http://localhost:9090`
+MIT
