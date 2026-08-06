@@ -352,7 +352,7 @@ Each benchmark records:
 
 | Component | Version |
 |-----------|---------|
-| Python | 3.11+ |
+| Python | 3.13+ |
 | FastAPI | Latest |
 | httpx | Latest |
 | Prometheus | Latest |
