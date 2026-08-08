@@ -6,13 +6,18 @@ import numpy as np
 
 @dataclass
 class RequestResult:
-    request_id: int
-    success: bool
-    latency_s: float
-    ttft_s: float | None
-    output_tokens: int | None
-    error: str | None = None
-
+        request_id: int
+        success: bool
+        latency_s: float
+        
+        ttft_s: float | None = None
+        output_tokens: int | None = None
+        error: str | None = None
+        
+        # streaming metrics
+        tpot_s: float | None = None
+        itl_ms: float | None = None
+        queue_time_s: float | None = None
 
 @dataclass
 class BenchmarkSummary:
@@ -26,20 +31,20 @@ class BenchmarkSummary:
     p95_latency_s: float
     p99_latency_s: float
     mean_ttft_s: float | None
-
+    
     def to_dict(self) -> dict:
         return asdict(self)
 
-
-def summarize(results: list[RequestResult], duration_s: float) -> BenchmarkSummary:
-    successful = [r for r in results if r.success]
+def summarize(results: list[RequestResult], duration_s:float)->BenchmarkSummary:
+    successful =  [r for r in results if r.success]
+    
     if not successful:
-        raise ValueError("No successful requests; inspect the raw result errors")
-
+        raise ValueError("nothing in the result")
+    
     latencies = np.asarray([r.latency_s for r in successful], dtype=float)
     token_counts = [r.output_tokens for r in successful if r.output_tokens is not None]
-    ttfts = [r.ttft_s for r in successful if r.ttft_s is not None]
-
+    ttfts = [r.ttfts for r in successful if r.ttfts is not None]
+    
     return BenchmarkSummary(
         total_requests=len(results),
         successful_requests=len(successful),
@@ -52,6 +57,3 @@ def summarize(results: list[RequestResult], duration_s: float) -> BenchmarkSumma
         p99_latency_s=float(np.percentile(latencies, 99)),
         mean_ttft_s=(float(mean(ttfts)) if ttfts else None),
     )
-
-# LEARNING TODO: Add TPOT/ITL. You need streaming timestamps and generated token counts.
-# LEARNING TODO: Add queue-time attribution by correlating client and vLLM Prometheus metrics.
