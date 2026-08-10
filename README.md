@@ -2,7 +2,7 @@
 
 A production-style inference gateway built on top of **vLLM** that provides a unified OpenAI-compatible HTTP API for text generation, supports streaming and non-streaming inference, exposes Prometheus metrics for full observability, and includes a benchmarking framework for evaluating latency, throughput, and scaling behavior under concurrent workloads.
 
-> **Status:** Gateway and observability stack are fully operational. KV cache benchmarking experiments are in progress — results will be updated as experiments complete across quantization and tensor parallelism configurations.
+> **Status:** Gateway and observability stack are fully operational. Baseline throughput benchmarks are complete. KV cache, quantization, and tensor parallelism experiments are in progress.
 
 ---
 
@@ -85,51 +85,68 @@ Client → POST /generate (stream=true)
 
 ---
 
-## Repository Structure
+## Benchmark Results
+
+### Baseline Throughput (FP16, TP=1)
+
+All results are 100% success rate across all concurrency levels.
+
+| Concurrency | Requests | Req/sec | Tokens/sec | Avg Latency | p50 Latency | p95 Latency | p99 Latency |
+|:-----------:|:--------:|:-------:|:----------:|:-----------:|:-----------:|:-----------:|:-----------:|
+| 1 (C=32) | 32 | 0.49 | 62.8 | 2.04s | 2.03s | 2.12s | 2.14s |
+| 8 (C=64) | 64 | 3.69 | 472.2 | 2.16s | 2.15s | 2.31s | 2.31s |
+| 32 (C=128) | 128 | 11.16 | 1,429.1 | 2.82s | 2.79s | 2.99s | 2.99s |
+
+**Key observations:**
+
+- **Throughput scales strongly with concurrency** — tokens/sec grows from 62.8 at C=32 to 1,429 at C=128, a **22.7× increase**, demonstrating vLLM's continuous batching efficiency
+- **Latency remains bounded under load** — p99 latency increases from 2.14s to 2.99s across the full concurrency range, less than 1.5× degradation despite a 4× increase in request volume
+- **100% success rate at all concurrency levels** — no dropped requests or timeout failures across all runs
+- **p95/p99 spread is tight** — less than 50ms gap between p95 and p99 at all concurrency levels, indicating consistent scheduling without outlier stalls
+
+### Throughput vs Concurrency
 
 ```
-adaptive-llm-serving/
-├── app/
-│   ├── api.py              # FastAPI routes, streaming, error handling
-│   ├── config.py           # Environment and model configuration
-│   ├── metrics.py          # Prometheus metric definitions
-│   ├── schemas.py          # Pydantic request/response models
-│   └── vllm_client.py      # Async vLLM HTTP client
-│
-├── benchmark/
-│   ├── load_generator.py   # Concurrent request load driver
-│   ├── metrics.py          # Benchmark result collection
-│   ├── plot_results.py     # Latency/throughput visualization
-│   ├── prometheus_snapshot.py  # Metric snapshots during runs
-│   ├── streaming_benchmark.py  # TTFT and streaming latency
-│   └── workloads.py        # Configurable prompt distributions
-│
-├── configs/
-│   ├── baseline.yaml
-│   ├── quantization.yaml       # AWQ / GPTQ configurations
-│   ├── speculative_decoding.yaml
-│   └── tensor_parallel.yaml    # TP=1,2,4 configurations
-│
-├── monitoring/
-│   ├── prometheus.yml
-│   └── grafana/
-│       ├── dashboard-starter.json
-│       └── provisioning/
-│
-├── tests/
-│   ├── test_api.py
-│   ├── test_metrics.py
-│   ├── test_schemas.py
-│   └── test_vllm_client.py
-│
-├── Dockerfile
-├── docker-compose.yml
-├── Makefile
-└── pyproject.toml
+Tokens/sec
+1,500 ┤                                    ●
+1,400 ┤
+1,300 ┤
+1,200 ┤
+1,100 ┤
+1,000 ┤
+  900 ┤
+  800 ┤
+  700 ┤
+  600 ┤
+  500 ┤                ●
+  400 ┤
+  300 ┤
+  200 ┤
+  100 ┤  ●
+    0 └──────────────────────────────────────
+       C=32          C=64          C=128
 ```
 
----
+### Latency Distribution (p50 / p95 / p99)
 
+```
+Latency (s)
+3.0 ┤                                 ● ● ●
+2.9 ┤
+2.8 ┤
+2.7 ┤
+2.6 ┤
+2.5 ┤
+2.4 ┤
+2.3 ┤               ● ●
+2.2 ┤             ●
+2.1 ┤
+2.0 ┤  ● ● ●
+    └──────────────────────────────────────
+       C=32          C=64          C=128
+
+  ● p50   ● p95   ● p99
+```
 ## Observability Stack
 
 The gateway exports Prometheus metrics scraped at `/metrics`. Grafana dashboards surface real-time system state.
@@ -170,19 +187,20 @@ The benchmark suite is designed to isolate the effect of individual variables ra
 
 ---
 
-## Benchmark Results
 
-> KV cache and quantization experiments are actively running. This section will be updated with full results including latency/throughput curves and per-configuration comparisons.
+### Upcoming Experiments
 
-**Baseline (FP16, TP=1) — preliminary:**
+The following configurations are queued and results will be added as runs complete:
 
-| Concurrency | Avg Latency | p95 Latency | Throughput |
-|:-----------:|:-----------:|:-----------:|:----------:|
-| 1 | — | — | — |
-| 8 | — | — | — |
-| 32 | — | — | — |
-
-*Full results including quantization comparisons (FP16 vs AWQ vs GPTQ) and tensor parallelism scaling (TP=1/2/4) to be published after experiment runs complete.*
+| Experiment | Status |
+|------------|--------|
+| Baseline FP16 — TTFT measurement | In progress |
+| AWQ quantization vs FP16 | Queued |
+| GPTQ quantization vs FP16 | Queued |
+| Tensor parallel TP=2 | Queued |
+| Tensor parallel TP=4 | Queued |
+| KV cache block size sweep | Queued |
+| Streaming latency (TTFT distribution) | Queued |
 
 ---
 
@@ -204,6 +222,10 @@ Prometheus enables real-time dashboards and percentile-accurate histograms acros
 
 PagedAttention's performance is sensitive to block size. Smaller blocks reduce fragmentation but increase allocation overhead. Larger blocks improve throughput under long sequences but waste memory on short ones. The benchmark configs sweep block sizes alongside quantization to isolate this interaction — results pending.
 
+**On the latency/throughput tradeoff observed in results:**
+
+The benchmark shows that p99 latency increases by ~40% (2.14s → 2.99s) as concurrency grows from C=32 to C=128, while tokens/sec grows by 22.7×. This is the expected continuous batching tradeoff — the scheduler holds individual requests slightly longer to fill larger batches, which is the right call for throughput-optimized serving. A latency-optimized configuration would cap batch size and accept lower tokens/sec.
+
 ---
 
 ## Current Limitations
@@ -211,7 +233,8 @@ PagedAttention's performance is sensitive to block size. Smaller blocks reduce f
 - Single vLLM backend — no load balancing across replicas
 - No authentication or rate limiting on the gateway
 - No autoscaling — static capacity provisioning
-- KV cache and quantization benchmark results pending hardware availability
+- TTFT not yet instrumented in baseline runs (null in current results)
+- Quantization and tensor parallelism results pending
 
 These are known constraints, not oversights. The project scope is infrastructure observability and systematic benchmarking, not production serving at scale.
 
@@ -250,7 +273,9 @@ Grafana: `http://localhost:3000`
 Baseline throughput:
 
 ```bash
-python benchmark/load_generator.py --concurrency 1 4 8 16 32
+python -m benchmark.load_generator --workload baseline_c1 --output results/raw/baseline_c1.json
+python -m benchmark.load_generator --workload baseline_c8 --output results/raw/baseline_c8.json
+python -m benchmark.load_generator --workload baseline_c32 --output results/raw/baseline_c32.json
 ```
 
 Streaming TTFT:
