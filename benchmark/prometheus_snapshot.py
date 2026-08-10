@@ -1,4 +1,4 @@
-"""Capture the raw vLLM /metrics endpoint before and after experiments."""
+"""Show the raw vLLM /metrics endpoint before and after experiments."""
 
 import argparse
 from pathlib import Path
