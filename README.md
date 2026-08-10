@@ -441,7 +441,6 @@ Metrics:
 Current limitations include:
 
 - Single vLLM backend instance
-- No request batching inside the gateway
 - No authentication or rate limiting
 - No autoscaling
 - No distributed load balancing
@@ -449,21 +448,6 @@ Current limitations include:
 
 ---
 
-# Future Work
-
-Potential improvements:
-
-- Dynamic routing across multiple vLLM instances
-- Request batching
-- KV cache-aware scheduling
-- Kubernetes deployment
-- Distributed Prometheus/Grafana
-- Multi-model routing
-- Authentication
-- Rate limiting
-- Autoscaling
-
----
 
 # Running the Project
 
