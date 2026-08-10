@@ -1,9 +1,20 @@
-"""Integration-test starter.
+# with having api request check.
+# we can you Counter to count total api requests. (positive for internal usage only)
+# use buckets to fill and reject if empty follow refill time/requests
+from app.schemas import GenerateRequest, GenerateResponse
+import pytest
+from pydantic import ValidationError
 
-TODO: use httpx.ASGITransport and mock VLLMClient.complete/stream so CI does not require a GPU.
-Then add a separate @pytest.mark.gpu test that talks to a live vLLM server.
-"""
+def test_generate_request():
+    request = GenerateRequest(prompt="explain continuous batching")
+    
+    assert request.prompt == "explain continuous batching"
+    assert request.max_tokens == 128
+    assert request.temperature ==0.7
+    assert request.top_p == 0.5
+    assert request.stream == True
+    assert request.seed is None
 
-
-def test_integration_placeholder() -> None:
-    assert True
+def test_generate_request_rejects_blank_prompt():
+    with pytest.raises(ValidationError):
+        GenerateRequest(prompt="   ")

@@ -1,16 +1,29 @@
-from pydantic import BaseModel, Field
+#Api JSON-> pydantic model-> python ob
+
+from pydantic import BaseModel, Field, field_validator
 
 
 class GenerateRequest(BaseModel):
-    prompt: str = Field(min_length=1)
-    max_tokens: int = Field(default=128, ge=1, le=2048)
+    prompt: str = Field(min_length =1)
+    max_tokens: int = Field(default=128, ge=1, le =2048)
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
-    top_p: float = Field(default=0.95, gt=0.0, le=1.0)
+    top_p: float = Field(default = 0.95, gt=0.0, le=1.0)
     seed: int | None = None
     stream: bool = False
-
-
+    
+    
+    @field_validator("prompt")
+    @classmethod
+    def validate_prompt(cls,value:str)->str:
+        stripped = value.strip()
+        
+        if not stripped:
+            raise ValueError("prompt is blank")
+        
+        return stripped
+    
 class GenerateResponse(BaseModel):
-    text: str
+    text:str
     request_latency_s: float
-    model: str
+    model : str
+    output_tokens: int | None = None

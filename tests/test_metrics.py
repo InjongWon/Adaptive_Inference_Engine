@@ -1,13 +1,16 @@
-from benchmark.metrics import RequestResult, summarize
+from prometheus_client import Counter, Gauge, Histogram
+from app.metrics import INFLIGHT, LATENCY, REQUESTS
 
-
-def test_summarize_latency_and_throughput() -> None:
-    results = [
-        RequestResult(0, True, 1.0, 0.2, 10),
-        RequestResult(1, True, 2.0, 0.3, 20),
-    ]
-    summary = summarize(results, duration_s=2.0)
-    assert summary.successful_requests == 2
-    assert summary.requests_per_second == 1.0
-    assert summary.output_tokens_per_second == 15.0
-    assert summary.mean_ttft_s == 0.25
+def test_metric_types():
+    
+    assert isinstance(REQUESTS, Counter)
+    assert isinstance(INFLIGHT, Gauge)
+    assert isinstance(LATENCY, Histogram)
+    
+def test_request_counter():
+    assert REQUESTS._labelnames == ("status",)
+    
+def test_metric_names():
+    assert REQUESTS._name == "gateway_requests"
+    assert INFLIGHT._name == "gateway_inflight_requests"
+    assert LATENCY._name == "latency_gateway_request"

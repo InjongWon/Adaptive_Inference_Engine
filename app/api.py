@@ -44,6 +44,7 @@ async def generate(req:GenerateRequest):
             text=result["choices"][0]["text"],
             request_latency_s=0.0,
             model=result.get("model", settings.model_name),
+            output_tokens=result.get("usage", {}).get("completion_tokens"),
         )
     except (httpx.HTTPError, KeyError) as exc:
         REQUESTS.labels(status="error").inc()
