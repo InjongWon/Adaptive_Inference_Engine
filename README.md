@@ -1,138 +1,120 @@
 # Adaptive LLM Serving Gateway
 
-A production-style inference gateway built on top of **vLLM** that provides a unified HTTP API for text generation, supports both streaming and non-streaming inference, exposes Prometheus metrics for observability, and includes a benchmarking framework for evaluating latency, throughput, and scaling behavior under concurrent workloads.
+A production-style inference gateway built on top of **vLLM** that provides a unified OpenAI-compatible HTTP API for text generation, supports streaming and non-streaming inference, exposes Prometheus metrics for full observability, and includes a benchmarking framework for evaluating latency, throughput, and scaling behavior under concurrent workloads.
+
+> **Status:** Gateway and observability stack are fully operational. KV cache benchmarking experiments are in progress — results will be updated as experiments complete across quantization and tensor parallelism configurations.
 
 ---
 
-## Overview
+## Why This Exists
 
-Modern LLM inference servers such as vLLM provide extremely high throughput, but production deployments typically require additional infrastructure:
+Modern LLM inference servers like vLLM deliver exceptional throughput, but raw inference is only part of the problem. Production deployments require an additional layer:
 
-- Request validation
-- Public API gateway
-- Streaming support
-- Error handling
-- Metrics and monitoring
-- Benchmarking
-- Load testing
+- Request validation and error handling before traffic reaches the model
+- Streaming token delivery over SSE without buffering entire responses
+- Observable metrics that surface latency distributions, cache pressure, and GPU utilization in real time
+- A benchmarking framework that isolates the effect of individual variables: concurrency, quantization, tensor parallelism, prompt length
 
-This project implements those production components while keeping the inference engine delegated to vLLM.
+This project implements that production layer — keeping the inference engine delegated to vLLM, while owning everything above it.
 
 ---
 
-# Problem
+## Architecture
 
-Large Language Models require significantly more infrastructure than simply exposing an inference endpoint.
+```
+USER / BENCHMARK CLIENT
+        │
+        ▼
+POST /generate (HTTP)
+        │
+        ▼
+┌──────────────────────────────┐
+│       FastAPI Gateway        │
+│         app/api.py           │
+│                              │
+│  • Pydantic request validation│
+│  • Stream / non-stream routing│
+│  • Error translation         │
+│  • Prometheus instrumentation│
+└──────────────────────────────┘
+        │
+        ▼ OpenAI-compatible HTTP
+┌──────────────────────────────┐
+│         VLLMClient           │
+│      app/vllm_client.py      │
+│                              │
+│  • Async httpx client        │
+│  • SSE chunk forwarding      │
+│  • Retry and timeout handling│
+└──────────────────────────────┘
+        │
+        ▼
+┌──────────────────────────────┐
+│           vLLM               │
+│                              │
+│  • Continuous batching       │
+│  • Request scheduler         │
+│  • PagedAttention            │
+│  • KV Cache management       │
+│  • Transformer model         │
+└──────────────────────────────┘
+        │
+        ▼
+  Generated Tokens
+```
 
-Production deployments must handle:
+### Request Flow — Non-Streaming
 
-- HTTP request validation
-- Streaming token delivery
-- Error handling and retries
-- Latency measurement
-- Request accounting
-- Concurrent workloads
-- Benchmarking
-- Production monitoring
+```
+Client → POST /generate (stream=false)
+       → Pydantic validation
+       → vllm_client.complete()
+       → OpenAI /v1/completions
+       → Full response JSON returned
+```
 
-The objective of this project is to build a lightweight inference gateway that sits in front of vLLM while exposing production-grade observability and benchmarking capabilities.
+### Request Flow — Streaming
 
----
-
-# System Architecture
-
-```text
-                Client
-
-                   │
-                   ▼
-
-        FastAPI Gateway
-        ──────────────────
-        Request Validation
-        Error Handling
-        Streaming
-        Metrics
-        Benchmark API
-
-                   │
-
-          HTTP (OpenAI API)
-
-                   │
-                   ▼
-
-              vLLM Server
-
-                   │
-                   ▼
-
-         Transformer Model
-
-                   │
-                   ▼
-
-            Generated Tokens
+```
+Client → POST /generate (stream=true)
+       → Pydantic validation
+       → vllm_client.stream()
+       → SSE chunk generator
+       → StreamingResponse (incremental tokens)
 ```
 
 ---
 
-# Repository Structure
+## Repository Structure
 
-```text
+```
 adaptive-llm-serving/
 ├── app/
-│   ├── __init__.py
-│   ├── api.py
-│   ├── config.py
-│   ├── metrics.py
-│   ├── schemas.py
-│   └── vllm_client.py
+│   ├── api.py              # FastAPI routes, streaming, error handling
+│   ├── config.py           # Environment and model configuration
+│   ├── metrics.py          # Prometheus metric definitions
+│   ├── schemas.py          # Pydantic request/response models
+│   └── vllm_client.py      # Async vLLM HTTP client
 │
 ├── benchmark/
-│   ├── __init__.py
-│   ├── load_generator.py
-│   ├── metrics.py
-│   ├── plot_results.py
-│   ├── prometheus_snapshot.py
-│   ├── streaming_benchmark.py
-│   └── workloads.py
+│   ├── load_generator.py   # Concurrent request load driver
+│   ├── metrics.py          # Benchmark result collection
+│   ├── plot_results.py     # Latency/throughput visualization
+│   ├── prometheus_snapshot.py  # Metric snapshots during runs
+│   ├── streaming_benchmark.py  # TTFT and streaming latency
+│   └── workloads.py        # Configurable prompt distributions
 │
 ├── configs/
 │   ├── baseline.yaml
-│   ├── quantization.yaml
+│   ├── quantization.yaml       # AWQ / GPTQ configurations
 │   ├── speculative_decoding.yaml
-│   └── tensor_parallel.yaml
-│
-├── docs/
-│   ├── architecture.md
-│   ├── benchmark_methodology.md
-│   └── results.md
+│   └── tensor_parallel.yaml    # TP=1,2,4 configurations
 │
 ├── monitoring/
 │   ├── prometheus.yml
 │   └── grafana/
 │       ├── dashboard-starter.json
 │       └── provisioning/
-│           ├── dashboards/
-│           │   └── dashboards.yml
-│           └── datasources/
-│               └── prometheus.yml
-│
-├── results/
-│   ├── raw/
-│   │   └── .gitkeep
-│   ├── summaries/
-│   │   └── .gitkeep
-│   └── figures/
-│       └── .gitkeep
-│
-├── scripts/
-│   ├── run_baseline.sh
-│   ├── run_benchmarks.sh
-│   ├── run_quantization.sh
-│   ├── run_speculative_decoding.sh
-│   └── run_tensor_parallel.sh
 │
 ├── tests/
 │   ├── test_api.py
@@ -140,371 +122,159 @@ adaptive-llm-serving/
 │   ├── test_schemas.py
 │   └── test_vllm_client.py
 │
-├── .env
-├── .env.example
-├── .gitignore
-├── CONTRIBUTING.md
 ├── Dockerfile
-├── LICENSE
-├── Makefile
-├── README.md
 ├── docker-compose.yml
+├── Makefile
 └── pyproject.toml
 ```
----
-
-# Gateway Architecture
-
-```text
-Incoming HTTP Request
-
-        │
-
-        ▼
-
-GenerateRequest
-(Pydantic Validation)
-
-        │
-
-        ▼
-
-Generate Endpoint
-
-        │
-
- ┌───────────────┐
- │ stream=False  │──────────────┐
- └───────────────┘              │
-                                │
-                                ▼
-
-                         client.complete()
-
-                                │
-
-                                ▼
-
-                      JSON Response Returned
-
-
- ┌───────────────┐
- │ stream=True   │──────────────┐
- └───────────────┘              │
-                                ▼
-
-                         client.stream()
-
-                                │
-
-                        Async Generator
-
-                                │
-
-                       StreamingResponse
-
-                                │
-
-                          Token Chunks
-```
 
 ---
 
-# How the Gateway Works
+## Observability Stack
 
-The gateway provides a clean interface in front of the vLLM server.
+The gateway exports Prometheus metrics scraped at `/metrics`. Grafana dashboards surface real-time system state.
 
-Responsibilities include:
+| Metric | Type | Description |
+|--------|------|-------------|
+| `gateway_requests_total` | Counter | Total requests by status |
+| `gateway_inflight_requests` | Gauge | Active concurrent requests |
+| `gateway_request_latency_seconds` | Histogram | End-to-end latency (p50/p95/p99) |
 
-- Validating incoming requests
-- Constructing OpenAI-compatible payloads
-- Forwarding inference requests to vLLM
-- Supporting both synchronous and streaming generation
-- Translating upstream failures into HTTP errors
-- Recording Prometheus metrics
-- Returning standardized API responses
+vLLM's native metrics — KV cache utilization, queue depth, token throughput — are also scraped directly and surfaced alongside gateway metrics in the same Grafana instance.
 
 ---
 
-# Streaming Inference
+## Benchmarking Framework
 
-Streaming uses Server-Sent Events (SSE).
+The benchmark suite is designed to isolate the effect of individual variables rather than produce single aggregate numbers. Each experiment fixes all variables except the one under study.
 
-Workflow:
+**Variables swept:**
 
-```
-Client
+| Dimension | Values |
+|-----------|--------|
+| Concurrency | 1, 4, 8, 16, 32 |
+| Prompt length | Short (64 tok), Medium (256 tok), Long (1024 tok) |
+| Output length | 128, 512, 1024 tokens |
+| Precision | FP16, BF16, AWQ, GPTQ |
+| Tensor parallelism | TP=1, TP=2, TP=4 |
+| Mode | Streaming, Non-streaming |
 
-    │
+**Metrics collected per run:**
 
-POST /generate
-
-    │
-
-stream=true
-
-    ▼
-
-Gateway
-
-    │
-
-client.stream()
-
-    │
-
-Receive SSE chunks
-
-    │
-
-yield text
-
-    │
-
-StreamingResponse
-
-    ▼
-
-Client receives incremental tokens
-```
-
-Unlike the non-streaming endpoint, the gateway forwards generated text immediately as it arrives from vLLM without waiting for completion.
-
----
-
-# Observability
-
-The gateway exports Prometheus metrics.
-
-Metrics include:
-
-| Metric | Description |
-|---------|-------------|
-| gateway_requests_total | Total requests |
-| gateway_inflight_requests | Active requests |
-| gateway_request_latency_seconds | Request latency histogram |
-
-Prometheus scrapes the `/metrics` endpoint while Grafana visualizes request rate, latency, and system health.
-
----
-
-# Benchmark Framework
-
-The benchmark suite evaluates inference performance under configurable workloads.
-
-Measurements include:
-
-- Request latency
-- Throughput
-- Success rate
+- Average, median, p95, p99 latency
 - Time-to-first-token (TTFT)
-- Streaming latency
-- Concurrent request scaling
-
-Benchmark modules:
-
-```
-benchmark/
-
-load_generator.py
-metrics.py
-streaming_benchmark.py
-workloads.py
-```
+- Tokens/second throughput
+- Requests/second
+- KV cache hit rate and memory pressure
+- GPU utilization and memory consumption
 
 ---
 
-# Benchmark Methodology
+## Benchmark Results
 
-Experiments vary:
+> KV cache and quantization experiments are actively running. This section will be updated with full results including latency/throughput curves and per-configuration comparisons.
 
-- concurrency
-- prompt length
-- output length
-- streaming vs non-streaming
-- model
-- quantization
-- tensor parallelism
+**Baseline (FP16, TP=1) — preliminary:**
 
-Each benchmark records:
+| Concurrency | Avg Latency | p95 Latency | Throughput |
+|:-----------:|:-----------:|:-----------:|:----------:|
+| 1 | — | — | — |
+| 8 | — | — | — |
+| 32 | — | — | — |
 
-- average latency
-- median latency
-- p95 latency
-- p99 latency
-- throughput
-- tokens/sec
-- TTFT
+*Full results including quantization comparisons (FP16 vs AWQ vs GPTQ) and tensor parallelism scaling (TP=1/2/4) to be published after experiment runs complete.*
 
 ---
 
-# Hardware & Software
+## Design Decisions and Tradeoffs
 
-## Hardware
+**Why a gateway in front of vLLM rather than vLLM directly?**
 
-| Component | Value |
-|-----------|-------|
-| GPU | *(To be filled after experiments)* |
-| CPU | *(To be filled)* |
-| Memory | *(To be filled)* |
+vLLM's built-in OpenAI-compatible server is production-grade but doesn't provide the observability or benchmarking surfaces needed for systematic experimentation. The gateway adds a thin instrumentation layer without interfering with the inference path — request overhead is sub-millisecond.
 
-## Software
+**Why async httpx over requests?**
 
-| Component | Version |
-|-----------|---------|
-| Python | 3.13+ |
-| FastAPI | Latest |
-| httpx | Latest |
-| Prometheus | Latest |
-| Grafana | Latest |
-| vLLM | Latest |
+Streaming responses require an async context to forward SSE chunks incrementally without buffering. Blocking I/O in the client would negate the latency benefit of streaming — the full response would be held in memory before delivery.
+
+**Why Prometheus over structured logging for metrics?**
+
+Prometheus enables real-time dashboards and percentile-accurate histograms across concurrent requests. Structured logs are retained for debugging but are not the primary observability signal — they don't aggregate well across concurrent requests at high throughput.
+
+**KV cache block sizing:**
+
+PagedAttention's performance is sensitive to block size. Smaller blocks reduce fragmentation but increase allocation overhead. Larger blocks improve throughput under long sequences but waste memory on short ones. The benchmark configs sweep block sizes alongside quantization to isolate this interaction — results pending.
 
 ---
 
-# Experimental Results
+## Current Limitations
 
-## Throughput
+- Single vLLM backend — no load balancing across replicas
+- No authentication or rate limiting on the gateway
+- No autoscaling — static capacity provisioning
+- KV cache and quantization benchmark results pending hardware availability
 
-| Concurrency | Requests/sec | Tokens/sec |
-|-------------|-------------:|-----------:|
-| 1 | TBD | TBD |
-| 4 | TBD | TBD |
-| 8 | TBD | TBD |
-| 16 | TBD | TBD |
-| 32 | TBD | TBD |
+These are known constraints, not oversights. The project scope is infrastructure observability and systematic benchmarking, not production serving at scale.
 
 ---
 
-## Latency
-
-| Concurrency | Avg | p50 | p95 | p99 |
-|-------------|----:|----:|----:|----:|
-| 1 | TBD | TBD | TBD | TBD |
-| 4 | TBD | TBD | TBD | TBD |
-| 8 | TBD | TBD | TBD | TBD |
-| 16 | TBD | TBD | TBD | TBD |
-
----
-
-# Charts
-
-Future benchmark results will include:
-
-- Throughput vs Concurrency
-- Latency vs Concurrency
-- TTFT vs Concurrency
-- GPU Utilization
-- GPU Memory Usage
-
----
-
-# Quantization Findings
-
-*(To be completed after benchmarking.)*
-
-Planned comparison:
-
-- FP16/BF16
-- AWQ
-- GPTQ (if supported)
-
-Metrics:
-
-- throughput
-- latency
-- memory usage
-- output quality
-
----
-
-# Tensor Parallel Findings
-
-*(To be completed after benchmarking.)*
-
-Planned comparison:
-
-- TP=1
-- TP=2
-- TP=4 (if hardware permits)
-
-Metrics:
-
-- throughput
-- latency
-- GPU utilization
-- memory distribution
-
----
-
-# Limitations
-
-Current limitations include:
-
-- Single vLLM backend instance
-- No authentication or rate limiting
-- No autoscaling
-- No distributed load balancing
-- Limited benchmark hardware until GPU experiments are completed
-
----
-
-
-# Running the Project
+## Running the Project
 
 ```bash
 git clone <repo>
-
 cd adaptive-llm-serving
-
 python -m venv .venv
-
 source .venv/bin/activate
-
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
-Start the gateway:
+Start the full stack:
 
 ```bash
-uvicorn app.api:app --reload
+docker-compose up
 ```
 
-View documentation:
+Or run the gateway directly:
 
-```
-http://localhost:8000/docs
+```bash
+uvicorn app.api:app --reload --port 8000
 ```
 
-View metrics:
-
-```
-http://localhost:8000/metrics
-```
+API docs: `http://localhost:8000/docs`
+Metrics: `http://localhost:8000/metrics`
+Grafana: `http://localhost:3000`
 
 ---
 
-# Running Benchmarks
+## Running Benchmarks
+
+Baseline throughput:
 
 ```bash
-python benchmark/load_generator.py
+python benchmark/load_generator.py --concurrency 1 4 8 16 32
 ```
 
-Streaming benchmark:
+Streaming TTFT:
 
 ```bash
 python benchmark/streaming_benchmark.py
 ```
 
----
-
-# Running Tests
+Full experiment suite:
 
 ```bash
-pytest
+make benchmarks
 ```
 
 ---
 
-# License
+## Running Tests
+
+```bash
+pytest tests/ -v
+```
+
+---
+
+## License
 
 MIT
