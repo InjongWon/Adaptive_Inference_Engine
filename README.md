@@ -268,16 +268,6 @@ Grafana: `http://localhost:3000`
 
 ---
 
-## Running Benchmarks
-
-Baseline throughput:
-
-```bash
-python -m benchmark.load_generator --workload baseline_c1 --output results/raw/baseline_c1.json
-python -m benchmark.load_generator --workload baseline_c8 --output results/raw/baseline_c8.json
-python -m benchmark.load_generator --workload baseline_c32 --output results/raw/baseline_c32.json
-```
-
 Streaming TTFT:
 
 ```bash
