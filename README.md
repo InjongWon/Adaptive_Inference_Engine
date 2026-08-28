@@ -5,7 +5,7 @@ An LLM inference systems project built around two pieces:
 - a production-style serving stack running **Qwen3-1.7B with vLLM on NVIDIA GPUs**
 - a small inference engine built from scratch to understand and experiment with **scheduling, continuous batching, KV caching, prefill/decode, and paged memory management**
 
-I started by treating vLLM as a black box: drive it with controlled workloads, measure throughput and latency, and understand how serving behavior changes under concurrency. From there, I began rebuilding the inference path from first principles in mini_vllm—request lifecycle, prefill vs. decode, KV cache reuse, scheduling, continuous batching, sampling, and paged memory management.
+I started by benchmarking vLLM drive it with controlled workloads, measure throughput and latency, and understand how serving behavior changes under concurrency. From there, I began rebuilding the inference path from first principles in mini_vllm—request lifecycle, prefill vs. decode, KV cache reuse, scheduling, continuous batching, sampling, and paged memory management.
 
 ## Architecture
 
