@@ -82,7 +82,7 @@ The goal is not to reimplement transformer kernels or CUDA primitives. It is to 
                                     ▼
                          ┌─────────────────────┐
                          │        vLLM         │
-                         │    Qwen3-8B       │
+                         │    Qwen3-8B         │
                          └──────────┬──────────┘
                                     │
                                     ▼
