@@ -4,7 +4,7 @@ Adaptive LLM Serving is an inference-systems project for understanding and exper
 
 The project approaches inference from two directions:
 
-1. **Production serving** — Qwen3-1.7B served with vLLM on NVIDIA B200 infrastructure, with an OpenAI-compatible gateway, streaming, observability, and a workload benchmarking harness.
+1. **Production serving** — Qwen3-8B served with vLLM on NVIDIA B200 infrastructure, with an OpenAI-compatible gateway, streaming, observability, and a workload benchmarking harness.
 2. **Inference engine internals** — `mini_vllm`, a PyTorch-based inference engine built from first principles to make scheduling, batching, KV-cache reuse, and memory-management decisions explicit and experimentally measurable.
 
 The goal is not to reimplement transformer kernels or CUDA primitives. It is to understand the systems layer between an incoming generation request and model execution, and connect those design decisions to **TTFT, TPOT, throughput, tail latency, and memory utilization**.
