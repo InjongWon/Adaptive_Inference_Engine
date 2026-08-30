@@ -58,9 +58,10 @@ The goal is not to reimplement transformer kernels or CUDA primitives. It is to 
                                              │
                                              └──→ schedule again
 
-### Production serving
+
 
 ```text
+## Production serving
                          ┌─────────────────────┐
                          │  Benchmark Clients  │
                          │                     │
