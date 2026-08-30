@@ -57,11 +57,11 @@ The goal is not to reimplement transformer kernels or CUDA primitives. It is to 
                                       request state
                                              │
                                              └──→ schedule again
+```
 
-
-
-```text
 ## Production serving
+```text
+
                          ┌─────────────────────┐
                          │  Benchmark Clients  │
                          │                     │
