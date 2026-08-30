@@ -82,7 +82,7 @@ The goal is not to reimplement transformer kernels or CUDA primitives. It is to 
                                     ▼
                          ┌─────────────────────┐
                          │        vLLM         │
-                         │    Qwen3-1.7B       │
+                         │    Qwen3-8B       │
                          └──────────┬──────────┘
                                     │
                                     ▼
@@ -300,7 +300,7 @@ Workloads vary concurrency, prompt length, generation length, scheduling policy,
 
 ## vLLM Baseline
 
-Initial concurrency measurements against Qwen3-1.7B on a single NVIDIA B200:
+Initial concurrency measurements against Qwen3-8B on a single NVIDIA B200:
 
 | Concurrency | Requests | Req/s | Output tok/s | Mean latency | p95 | p99 |
 |---:|---:|---:|---:|---:|---:|---:|
