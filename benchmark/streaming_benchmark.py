@@ -19,7 +19,7 @@ async def measure_stream(base_url: str, prompt: str) -> dict:
             f"{base_url.rstrip('/')}/v1/completions",
             headers={"Authorization": "Bearer local-token"},
             json={
-                "model": "Qwen/Qwen3-1.7B",
+                "model": "Qwen/Qwen3-8B",
                 "prompt": prompt,
                 "max_tokens": 128,
                 "stream": True,
