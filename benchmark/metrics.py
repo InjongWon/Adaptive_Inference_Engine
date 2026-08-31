@@ -39,11 +39,11 @@ def summarize(results: list[RequestResult], duration_s:float)->BenchmarkSummary:
     successful =  [r for r in results if r.success]
     
     if not successful:
-        raise ValueError("nothing in the result")
+        raise ValueError("empty result")
     
     latencies = np.asarray([r.latency_s for r in successful], dtype=float)
     token_counts = [r.output_tokens for r in successful if r.output_tokens is not None]
-    ttfts = [r.ttfts for r in successful if r.ttfts is not None]
+    ttft_s = [r.ttft_s for r in successful if r.ttft_s is not None]
     
     return BenchmarkSummary(
         total_requests=len(results),
@@ -55,5 +55,5 @@ def summarize(results: list[RequestResult], duration_s:float)->BenchmarkSummary:
         p50_latency_s=float(np.percentile(latencies, 50)),
         p95_latency_s=float(np.percentile(latencies, 95)),
         p99_latency_s=float(np.percentile(latencies, 99)),
-        mean_ttft_s=(float(mean(ttfts)) if ttfts else None),
+        mean_ttft_s=(float(mean(ttft_s)) if ttft_s else None),
     )

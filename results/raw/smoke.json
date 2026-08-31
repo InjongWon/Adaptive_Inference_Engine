@@ -1,0 +1,46 @@
+{
+  "workload": "smoke",
+  "configuration": {
+    "concurrency": 1,
+    "requests": 2,
+    "max_tokens": 32,
+    "temperature": 0.0,
+    "top_p": 1.0
+  },
+  "summary": {
+    "total_requests": 2,
+    "successful_requests": 2,
+    "duration_s": 2.38894800003618,
+    "requests_per_second": 0.8371885867627552,
+    "output_tokens_per_second": 26.790034776408167,
+    "mean_latency_s": 1.194370604120195,
+    "p50_latency_s": 1.194370604120195,
+    "p95_latency_s": 1.4236437473911792,
+    "p99_latency_s": 1.4440235823486,
+    "mean_ttft_s": null
+  },
+  "requests": [
+    {
+      "request_id": 0,
+      "success": true,
+      "latency_s": 1.4491185410879552,
+      "ttft_s": null,
+      "output_tokens": 32,
+      "error": null,
+      "tpot_s": null,
+      "itl_ms": null,
+      "queue_time_s": null
+    },
+    {
+      "request_id": 1,
+      "success": true,
+      "latency_s": 0.9396226671524346,
+      "ttft_s": null,
+      "output_tokens": 32,
+      "error": null,
+      "tpot_s": null,
+      "itl_ms": null,
+      "queue_time_s": null
+    }
+  ]
+}

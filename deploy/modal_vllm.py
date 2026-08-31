@@ -2,7 +2,7 @@
 import modal
 
 
-MODEL_NAME = "Qwen/Qwen3-1.7B"
+MODEL_NAME = "Qwen/Qwen2.5-32B-Instruct"
 VLLM_PORT = 8000
 N_GPU = 1
 
@@ -66,11 +66,11 @@ class Server:
             "--port",
             "8000",
             "--dtype",
-            "float16",
+            "bfloat16",
             "--tensor-parallel-size",
             "1",
             "--max-model-len",
-            "4096",
+            "8192",
         ]
 
         print("Starting vLLM:", " ".join(cmd), flush=True)

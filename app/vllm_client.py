@@ -39,7 +39,6 @@ class VLLMClient:
         }
         if req.seed is not None:
             load['seed'] = req.seed
-            
         return load
 
     async def complete(self,req:GenerateRequest)->dict:
@@ -66,7 +65,8 @@ class VLLMClient:
         ) as client:
             
             # /POST send the inference requestthen wait receive
-            response = await client.post('/v1/completion', json=payload)
+            response = await client.post('/v1/completions', json=payload)
+            
             response.raise_for_status()
             
             return response.json()

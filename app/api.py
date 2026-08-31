@@ -28,7 +28,7 @@ async def generate(req:GenerateRequest):
             statu_code = 200,
             media_type = "text/plain",
         )
-    start = time.perf_conter()
+    start = time.perf_counter()
     INFLIGHT.inc()
     result = await client.complete(req)
     
@@ -42,7 +42,7 @@ async def generate(req:GenerateRequest):
         
         return GenerateResponse(
             text=result["choices"][0]["text"],
-            request_latency_s=0.0,
+            request_latency_s=latency,
             model=result.get("model", settings.model_name),
             output_tokens=result.get("usage", {}).get("completion_tokens"),
         )
@@ -57,4 +57,22 @@ async def generate(req:GenerateRequest):
     finally:
         INFLIGHT.dec()
 
-    
+@app.get("/health")
+async def health() -> dict[str, str]:
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as http:
+            response = await http.get(
+                f"{settings.vllm_base_url.rstrip('/')}/health"
+            )
+            response.raise_for_status()
+
+        return {
+            "status": "ok",
+            "vllm": "reachable",
+        }
+
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"vLLM unavailable: {exc}",
+        ) from exc

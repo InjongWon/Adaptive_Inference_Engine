@@ -8,3 +8,26 @@ results/*.json
 results/*.png
 !results/.gitkeep
 .venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.venv/
+
+# Environment
+.env
+
+# macOS
+.DS_Store
+
+
+*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.env
+.DS_Store
