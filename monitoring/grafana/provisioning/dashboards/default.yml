@@ -1,7 +1,0 @@
-apiVersion: 1
-providers:
-  - name: default
-    folder: LLM Inference
-    type: file
-    options:
-      path: /var/lib/grafana/dashboards
