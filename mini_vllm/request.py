@@ -5,12 +5,14 @@ class RequestStatus(Enum):
     WAITING = auto()
     RUNNING = auto()
     FINISHED = auto()
-    
+
+
 @dataclass
 class Request:
-    request_id : int
+    request_id: int
     prompt_tokens: list[int]
-    max_tokens:int 
+    max_tokens: int
+    
     
     output_tokens: list[int] = field(default_factory = list)
     status: RequestStatus = RequestStatus.WAITING

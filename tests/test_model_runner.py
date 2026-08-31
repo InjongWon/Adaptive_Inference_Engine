@@ -1,4 +1,5 @@
 import torch
+import pytest
 
 from mini_vllm.model_runner import ModelRunner
 from mini_vllm.request import Request
@@ -147,3 +148,205 @@ def test_forward_with_real_transformer():
 
     assert logits.shape[0] == 3
     assert logits.shape[1] == model.config.vocab_size
+    
+
+def test_prefill_then_decode():
+    model_name = "hf-internal-testing/tiny-random-gpt2"
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name)
+
+    runner = ModelRunner(
+        model=model,
+        tokenizer=tokenizer,
+        device="cpu",
+    )
+
+    prompt_tokens = tokenizer.encode(
+        "Prefill then Decode",
+        add_special_tokens=False,
+    )
+
+    request = Request(
+        request_id=1,
+        prompt_tokens=prompt_tokens,
+        max_tokens=10,
+    )
+
+    logits, past_key_values, attention_mask= runner.prefill([request])
+    next_token = logits.argmax(dim=-1).item()
+    request.add_token(
+        next_token,
+        tokenizer.eos_token_id,
+    )
+    prev_mask_length = attention_mask.shape[1]
+    logits, past_key_values, attention_mask = runner.decode(
+        [request],
+        past_key_values,
+        attention_mask,
+    )
+    assert logits.shape[0] == 1
+    assert logits.shape[1] == model.config.vocab_size
+    
+    assert attention_mask.shape[1] == prev_mask_length + 1
+    
+
+def test_prefill_decode_updates_kv_cache():
+    model_name = "hf-internal-testing/tiny-random-gpt2"
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name)
+
+    runner = ModelRunner(
+        model=model,
+        tokenizer=tokenizer,
+        device="cpu",
+    )
+
+    prompt_tokens = tokenizer.encode(
+        "Hello world",
+        add_special_tokens=False,
+    )
+
+    request = Request(
+        request_id=1,
+        prompt_tokens=prompt_tokens,
+        max_tokens=10,
+    )
+
+    logits, past_key_values, attention_mask = runner.prefill(
+        [request]
+    )
+
+    kv_length_before = past_key_values.layers[0].keys.shape[2]
+
+    #greedy sampling
+    next_token_id = logits.argmax(dim=-1).item()
+
+    request.add_token(
+        next_token_id,
+        tokenizer.eos_token_id,
+    )
+
+    decode_logits, past_key_values, attention_mask = runner.decode(
+        [request],
+        past_key_values,
+        attention_mask,
+    )
+
+    kv_length_after = past_key_values.layers[0].keys.shape[2]
+
+    assert kv_length_after == kv_length_before + 1
+
+    #Attention mask should match the updated KV length
+    assert attention_mask.shape[1] == kv_length_after
+
+    #One token distribution for one request
+    assert decode_logits.shape == (
+        1,
+        model.config.vocab_size,
+    )
+    
+
+def test_batched_prefill_then_decode():
+    model_name = "hf-internal-testing/tiny-random-gpt2"
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name)
+
+    runner = ModelRunner(
+        model=model,
+        tokenizer=tokenizer,
+        device="cpu",
+    )
+
+    prompts = [
+        "Prefill",
+        "decode",
+        "KV Cache",
+    ]
+
+    requests = [
+        Request(
+            request_id=i,
+            prompt_tokens=tokenizer.encode(
+                prompt,
+                add_special_tokens=False,
+            ),
+            max_tokens=10,
+        )
+        for i, prompt in enumerate(prompts)
+    ]
+
+    #PREFILL all 3 requests together
+    logits, past_key_values, attention_mask = runner.prefill(
+        requests
+    )
+
+    kv_length_before = past_key_values.layers[0].keys.shape[2]
+
+    #choose one token for EACH request
+    next_token_ids = logits.argmax(dim=-1)
+
+    assert next_token_ids.shape == (3,)
+
+    #Store each generated token in its request
+    for request, token_id in zip(requests, next_token_ids.tolist()):
+        request.add_token(
+            token_id,
+            tokenizer.eos_token_id,
+        )
+
+    #Decode all 3 requests together
+    decode_logits, past_key_values, attention_mask = runner.decode(
+        requests,
+        past_key_values,
+        attention_mask,
+    )
+
+    kv_length_after = past_key_values.layers[0].keys.shape[2]
+
+    #check cache grew by ONE position
+    assert kv_length_after == kv_length_before + 1
+
+    #only generated one token  per request
+    assert decode_logits.shape == (
+        3,
+        model.config.vocab_size,
+    )
+
+    #Mask also grew by one position
+    assert attention_mask.shape[1] == kv_length_after
+    
+def test_decode_empty_requests():
+    runner = ModelRunner(
+        model=FakeModel(vocab_size=100),
+        tokenizer=FakeTokenizer(),
+        device="cpu",
+    )
+    attention_mask = torch.ones((1,3), dtype=torch.long)
+    with pytest.raises(ValueError):
+        runner.decode(
+            [],
+            past_key_values=None,
+            attention_mask=attention_mask,
+        )
+    
+def test_decode_empty_output_tokens():
+    runner = ModelRunner(
+        model = FakeModel(vocab_size=1000),
+        tokenizer=FakeTokenizer(),
+        device="cpu",
+    )
+    attention_mask = torch.ones((1, 3), dtype=torch.long)
+    request = Request(
+        request_id=1,
+        prompt_tokens=[10, 20, 30],
+        max_tokens=10,
+    )
+    with pytest.raises(ValueError):
+        runner.decode(
+            [request],
+            past_key_values=None,
+            attention_mask=attention_mask,
+        )
